@@ -8,13 +8,34 @@ import random
 from subprocess import Popen, PIPE
 
 state_abbrevs = [ \
-'AK', 'AL', 'AR', 'AS', 'AZ', 'CA', 'CO', 'CT', 'DC', 'DE', 'FL', 'GA', 'GU',
+'AK', 'AL', 'AR', 'AZ', 'CA', 'CO', 'CT', 'DC', 'DE', 'FL', 'GA',
 'HI', 'IA', 'ID', 'IL', 'IN', 'KS', 'KY', 'LA', 'MA', 'MD', 'ME', 'MI', 'MN',
-'MO', 'MP', 'MS', 'MT', 'NC', 'ND', 'NE', 'NH', 'NJ', 'NM', 'NV', 'NY', 'OH',
-'OK', 'OR', 'PA', 'PR', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VA', 'VI', 'VT',
+'MO', 'MS', 'MT', 'NC', 'ND', 'NE', 'NH', 'NJ', 'NM', 'NV', 'NY', 'OH',
+'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VA', 'VT',
 'WA', 'WI', 'WV', 'WY']
+assert len(state_abbrevs) == 50+1
 
+# covidtracking has data for, but we don't include, these:
+# AS American Samoa
+# GU Guam
+# MP Northern Mariana Islands
+# PR Puerto Rico
+# VI Virgin Islands
 
+state_names = {
+'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas', 'CA':
+'California', 'CO': 'Colorado', 'CT': 'Connecticut', 'DC':'District of Columbia', 'DE': 'Delaware', 'FL':
+'Florida', 'GA': 'Georgia', 'HI': 'Hawaii', 'ID': 'Idaho', 'IL': 'Illinois', 'IN':
+'Indiana', 'IA': 'Iowa', 'KS': 'Kansas', 'KY': 'Kentucky', 'LA': 'Louisiana', 'ME':
+'Maine', 'MD': 'Maryland', 'MA': 'Massachusetts', 'MI': 'Michigan', 'MN':
+'Minnesota', 'MS': 'Mississippi', 'MO': 'Missouri', 'MT': 'Montana', 'NE':
+'Nebraska', 'NV': 'Nevada', 'NH': 'New Hampshire', 'NJ': 'New Jersey', 'NM':
+'New Mexico', 'NY': 'New York', 'NC': 'North Carolina', 'ND': 'North Dakota', 'OH':
+'Ohio', 'OK': 'Oklahoma', 'OR': 'Oregon', 'PA': 'Pennsylvania', 'RI': 'Rhode Island',
+'SC': 'South Carolina', 'SD': 'South Dakota', 'TN': 'Tennessee', 'TX':
+'Texas', 'UT': 'Utah', 'VT': 'Vermont', 'VA': 'Virginia', 'WA': 'Washington', 'WV':
+'West Virginia', 'WI': 'Wisconsin', 'WY': 'Wyoming'
+}
 
 def shellout(cmd):
 	process = Popen(cmd, stdout=PIPE, stderr=PIPE)
@@ -217,7 +238,15 @@ def html(states=state_abbrevs):
 		while queue:
 			fp.write('<tr>\n')
 			for i in range(2):
-				fp.write('<td>%s<br><img src=./graphs/%s.png?r=%d></td>\n' % (queue[0], queue[0], random.randint(100000,999999)))
+				if not queue:
+					fp.write('<td></td>\n');
+					continue
+
+				state_abbrev = queue[0]
+				fp.write('<td>\n')
+				fp.write('  %s:<br>\n' % (state_names[state_abbrev]))
+				fp.write('  <img src=./graphs/%s.png?r=%d>\n' % (state_abbrev, random.randint(100000,999999)))
+				fp.write('</td>\n')
 				queue = queue[1:]
 			fp.write('</tr>\n\n')
 
