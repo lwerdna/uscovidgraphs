@@ -227,38 +227,44 @@ def html(states=state_abbrevs):
 		print('state %s has %d cases' % (state, state2total[state]))
 
 	with open('./index.html', 'w') as fp:
-		fp.write('<html>\n')
-		fp.write('<head>\n')
-		fp.write('<title>US covid graphs</title>\n')
-		fp.write('<style>\n')
-		fp.write('td {\n')
-		fp.write('	text-align: center;\n')
-		fp.write('}\n')
-		fp.write('</style>\n')
-
-		fp.write('<table>\n')
+		fp.write('<!DOCTYPE html>\n')
+		fp.write('<html lang="en">\n')
+		fp.write('  <head>\n')
+		fp.write('    <meta charset="utf-8">\n')
+		fp.write('    <title>US covid graphs</title>\n')
+		fp.write('    <style>\n')
+		fp.write('      td {\n')
+		fp.write('	      text-align: center;\n')
+		fp.write('      }\n')
+		fp.write('    </style>\n')
+		fp.write('  </head>\n')
+		fp.write('\n')
+		fp.write('  <table>\n')
 
 		queue = list(worst2best)
 		while queue:
-			fp.write('<tr>\n')
+			fp.write('    <tr>\n')
 			for i in range(2):
 				if not queue:
-					fp.write('<td></td>\n');
+					fp.write('      <td></td>\n');
 					continue
 
 				state_abbrev = queue[0]
-				fp.write('<td>\n')
-				fp.write('  %s:<br>\n' % (state_names[state_abbrev]))
-				fp.write('  <img src=./graphs/%s.png?r=%d>\n' % (state_abbrev, random.randint(100000,999999)))
-				fp.write('</td>\n')
+				fp.write('      <td>\n')
+				fp.write('        %s:<br>\n' % (state_names[state_abbrev]))
+				fpath = './graphs/%s.png' % state_abbrev
+				fp.write('        <img src=%s?mt=%d>\n' % (fpath, int(os.path.getmtime(fpath))))
+				fp.write('      </td>\n')
 				queue = queue[1:]
-			fp.write('</tr>\n\n')
+			fp.write('    </tr>\n')
 
-		fp.write('</table>\n')
+		fp.write('  </table>\n')
+		fp.write('\n')
 
-		fp.write('<p>Data comes from <a href="https://covidtracking.com/">The COVID Tracking Project</a> and their generous API.</p>')
-		fp.write('<p>Once %d data points greater than 100 are available, those less than 100 are ignored and comparison is made with the 2.5 day doubling curve.</p>' % min_points_doubler)
-		fp.write('<p>This project is open source: <a href="https://github.com/lwerdna/uscovidgraphs">https://github.com/lwerdna/uscovidgraphs</a></p>')
+		fp.write('  <p>Data comes from <a href="https://covidtracking.com/">The COVID Tracking Project</a> and their generous API. Graphs are drawn with <a href="http://www.gnuplot.info/">gnuplot</a>.</p>\n')
+		fp.write('  <p>Once %d data points greater than 100 are available, those less than 100 are ignored and comparison is made with the 2.5 day doubling curve.</p>\n' % min_points_doubler)
+		fp.write('  <p>This project is open source: <a href="https://github.com/lwerdna/uscovidgraphs">https://github.com/lwerdna/uscovidgraphs</a></p>\n')
+		fp.write('\n')
 
 		fp.write('</html>\n')
 
