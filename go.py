@@ -37,6 +37,9 @@ state_names = {
 'West Virginia', 'WI': 'Wisconsin', 'WY': 'Wyoming'
 }
 
+# the minimum data points >= 100 until the "doubler" mode of graphing activates
+min_points_doubler = 6
+
 def shellout(cmd):
 	process = Popen(cmd, stdout=PIPE, stderr=PIPE)
 	(stdout, stderr) = process.communicate()
@@ -144,7 +147,8 @@ def csv_get(fname, key):
 	return lookup[key]
 
 def write_gnuplot(state, positives, xtics):
-	doubler = len([x for x in positives if x >= 100]) >= 6
+	global min_points_doubler
+	doubler = len([x for x in positives if x >= 100]) >= min_points_doubler
 
 	if doubler:
 		i = 0
@@ -251,6 +255,11 @@ def html(states=state_abbrevs):
 			fp.write('</tr>\n\n')
 
 		fp.write('</table>\n')
+
+		fp.write('<p>Data comes from <a href="https://covidtracking.com/">The COVID Tracking Project</a> and their generous API.</p>')
+		fp.write('<p>Once %d data points greater than 100 are available, those less than 100 are ignored and comparison is made with the 2.5 day doubling curve.</p>' % min_points_doubler)
+		fp.write('<p>This project is open source: <a href="https://github.com/lwerdna/uscovidgraphs">https://github.com/lwerdna/uscovidgraphs</a></p>')
+
 		fp.write('</html>\n')
 
 if __name__ == '__main__':
