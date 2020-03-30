@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import re
 import os
@@ -131,12 +131,15 @@ def update_csvs(states=state_abbrevs):
 			with open(fpath_csv) as fp:
 				if fp.read().startswith('error'):
 					delete = True
+			if os.path.getsize(fpath_csv) == 0:
+				delete = True
 			if delete:
 				os.remove(fpath_csv)
 
 def csv_get(fname, key):
 	fpath = './csvs/' + fname
 	lookup = {}
+	print('opening %s' % fpath)
 	with open(fpath) as fp:
 		for line in fp.readlines():
 			(k, v) = line.split(',')
