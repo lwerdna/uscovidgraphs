@@ -108,7 +108,6 @@ def update_csvs(states=state_abbrevs):
 
 		cur = ISO8601ToEpoch('2020-%02d-%02d' % (month_start, day_start))
 		while cur < now:
-			
 			(month, day) = re.match(r'2020-(..)-(..)', epochToISO8601(cur)).group(1,2)
 			date_code = '2020%s%s' % (month, day)
 			fpath_csv = './csvs/%s-%s.csv' % (state, date_code)
@@ -117,24 +116,30 @@ def update_csvs(states=state_abbrevs):
 			if os.path.exists(fpath_csv):
 				print('%s exists, skipping download' % fpath_csv)
 				continue
+
 			url = 'https://covidtracking.com/api/states/daily.csv?state=%s&date=%s' % (state, date_code)
 			cmd = ['wget', url, '--output-document', fpath_csv]
-			print(cmd)
-			(stdout, stderr, ret_code) = shellout(cmd)
 
-			# error can come from wget or the file itself
-			if ret_code != 0:
-				continue
+			while 1:
+				print(cmd)
+				(stdout, stderr, ret_code) = shellout(cmd)
 
-			# delete files that show error
-			delete = False
-			with open(fpath_csv) as fp:
-				if fp.read().startswith('error'):
-					delete = True
-			if os.path.getsize(fpath_csv) == 0:
-				delete = True
-			if delete:
-				os.remove(fpath_csv)
+				redo = False
+
+				if ret_code != 0:
+					redo = True
+				with open(fpath_csv) as fp:
+					if fp.read().startswith('error'):
+						redo = True
+				if os.path.getsize(fpath_csv) == 0:
+					redo = True
+
+				if redo:
+					os.remove(fpath_csv)
+					continue
+
+				break
+
 
 def csv_get(fname, key):
 	fpath = './csvs/' + fname
