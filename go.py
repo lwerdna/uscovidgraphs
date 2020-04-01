@@ -197,6 +197,7 @@ def write_gnuplot(state, positives, xtics):
 		fp.write('plot "$data" using 1:2:xtic(3) title "positives" linecolor rgb "#0000FF", \\\n')
 		if doubler:
 			fp.write('%d*2**(x/2.5) title "2.5 day doubling" linecolor rgb "#FF0000", \\\n' % positives[0])
+			fp.write('%d*2**(x/3) title "3 day doubling" linecolor rgb "#FF0000", \\\n' % positives[0])
 
 		space = int(1.3*max_ / 20) if max_ - min_ > 100 else 1
 		fp.write('"$data" using 0:($2+%d):(sprintf("%%d",$2)) with labels notitle textcolor rgb "#0000FF"\n' % space)
