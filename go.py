@@ -7,6 +7,12 @@ import time
 import random
 from subprocess import Popen, PIPE
 
+# { 'TX' -> {
+#
+#
+# }
+data = {}
+
 state_abbrevs = [ \
 'AK', 'AL', 'AR', 'AZ', 'CA', 'CO', 'CT', 'DC', 'DE', 'FL', 'GA',
 'HI', 'IA', 'ID', 'IL', 'IN', 'KS', 'KY', 'LA', 'MA', 'MD', 'ME', 'MI', 'MN',
@@ -58,104 +64,75 @@ def ISO8601ToEpoch(isoString: str):
 	epoch = time.mktime(timeStruct)
 	return epoch
 
-def initialize_csvs():
-	for state in state_abbrevs:
-		state_done = False
-		got_first = False
+# download the latest csv from covid tracking project using wget
+def csv_update():
+	while 1:
+		if os.path.exists('/tmp/daily.csv'):
+			os.remove('/tmp/daily.csv')
 
-		for month in range(2,12+1):
-			if state_done: break
+		url = 'http://covidtracking.com/api/states/daily.csv'
+		cmd = ['wget', url, '--output-document', '/tmp/daily.csv']
+		print(cmd)
+		(stdout, stderr, ret_code) = shellout(cmd)
 
-			for day in range(1,31+1):
-				if state_done: break
+		if ret_code != 0:
+			print('wget returned %d, retrying...' % ret_code)
+			continue
 
-				date_code = '2020%02d%02d' % (month, day)
-				fpath_csv = './csvs/%s-%s.csv' % (state, date_code)
-				if os.path.exists(fpath_csv):
-					continue
-				url = 'https://covidtracking.com/api/states/daily.csv?state=%s&date=%s' % (state, date_code)
-				cmd = ['wget', url, '--output-document', fpath_csv]
-				print(cmd)
-				(stdout, stderr, ret_code) = shellout(cmd)
+		if os.path.getsize('/tmp/daily.csv') == 0:
+			print('downloaded csv is 0 bytes, retrying...')
+			continue
 
-				# error can come from wget or the file itself
-				error = False
-				if ret_code != 0:
-					error = True
-				else:
-					with open(fpath_csv) as fp:
-						if fp.read().startswith('error'):
-							error = True
-					if error:
-						os.remove(fpath_csv)
+		break
 
-				# initial errors are ok, but an error after we've gotten our first csv means we're done
-				if error:
-					if got_first:
-						state_done = True
-				else:
-					got_first = True
+# load the csv into the global data variable
+def csv_load():
+	global data
 
-def update_csvs(states=state_abbrevs):
+	lines = []
+	with open('/tmp/daily.csv') as fp:
+		lines = [x.strip() for x in fp.readlines()]
+
+	assert lines[0] == 'date,state,positive,negative,pending,hospitalized,death,total,hash,dateChecked,totalTestResults,fips,deathIncrease,hospitalizedIncrease,negativeIncrease,positiveIncrease,totalTestResultsIncrease'
+	lines = lines[1:]
+
+	for line in lines:
+		(date,state,positive,_,_,_,_,_,_,_,_,_,_,_,_,_,_) = line.split(',')
+		if not state in data:
+			data[state] = {}
+		#print('appending %s (%s,%s)' % (state, date, positive))
+		if positive == '': positive = 0
+		data[state][date] = int(positive)
+
+	# check for missing dates
 	now = time.time()
 
-	csvs = os.listdir('./csvs')
-	for state in states:
-		latest = sorted([x for x in csvs if x.startswith(state + '-')])[0]
-		m = re.match(r'^..-2020(..)(..).csv', latest)
-		(month_start, day_start) = map(int, m.group(1,2))
-		print('starting %s at 2020%02d%02d' % (state, month_start, day_start))
+	for state in state_abbrevs:
+		dates = data[state].keys()
 
-		cur = ISO8601ToEpoch('2020-%02d-%02d' % (month_start, day_start))
+		earliest = min(dates)
+		print('%s earliest date is %s' % (state, earliest))
+		m = re.match(r'^\d\d\d\d(\d\d)(\d\d)', earliest)
+
+		cur = ISO8601ToEpoch('2020-%s-%s' % (m.group(1), m.group(2)))
+		nowstr = epochToISO8601(now).replace('-','')
 		while cur < now:
-			(month, day) = re.match(r'2020-(..)-(..)', epochToISO8601(cur)).group(1,2)
-			date_code = '2020%s%s' % (month, day)
-			fpath_csv = './csvs/%s-%s.csv' % (state, date_code)
+			curstr = epochToISO8601(cur).replace('-','')
+			if not curstr in dates and curstr != nowstr:
+				raise Exception('%s has no data for %s' % (state, curstr))
 			cur += 24*3600
 
-			if os.path.exists(fpath_csv):
-				print('%s exists, skipping download' % fpath_csv)
-				continue
-
-			url = 'https://covidtracking.com/api/states/daily.csv?state=%s&date=%s' % (state, date_code)
-			cmd = ['wget', url, '--output-document', fpath_csv]
-
-			while 1:
-				print(cmd)
-				(stdout, stderr, ret_code) = shellout(cmd)
-
-				redo = False
-
-				if ret_code != 0:
-					redo = True
-				with open(fpath_csv) as fp:
-					if fp.read().startswith('error'):
-						redo = True
-				if os.path.getsize(fpath_csv) == 0:
-					redo = True
-
-				if redo:
-					os.remove(fpath_csv)
-					continue
-
-				break
-
-
-def csv_get(fname, key):
-	fpath = './csvs/' + fname
-	lookup = {}
-	print('opening %s' % fpath)
-	with open(fpath) as fp:
-		for line in fp.readlines():
-			(k, v) = line.split(',')
-			v = v.strip()
-			if not v:
-				v = 0
-			lookup[k] = v
-	return lookup[key]
-
-def write_gnuplot(state, positives, xtics):
+def write_gnuplot(state):
+	global data
 	global min_points_doubler
+
+	xtics = []
+	positives = []
+	for date in sorted(data[state]):
+		# mm/dd
+		xtics.append('%s/%s' % re.match(r'^\d\d\d\d(\d\d)(\d\d)$', date).group(1,2))
+		positives.append(data[state][date])
+
 	doubler = len([x for x in positives if x >= 100]) >= min_points_doubler
 
 	if doubler:
@@ -202,35 +179,10 @@ def write_gnuplot(state, positives, xtics):
 		space = int(1.3*max_ / 20) if max_ - min_ > 100 else 1
 		fp.write('"$data" using 0:($2+%d):(sprintf("%%d",$2)) with labels notitle textcolor rgb "#0000FF"\n' % space)
 
-def get_state_positives(state):
-	csvs = os.listdir('./csvs')
-	batch = sorted([x for x in csvs if x.startswith(state + '-')])
-
-	positives = []
-	for fname in batch:
-		positives.append(int(csv_get(fname, 'positive')))
-
-	return positives
-
-def graph(states=state_abbrevs):
-	csvs = os.listdir('./csvs')
-	for state in states:
-		positives = get_state_positives(state)
-
-		xtics = []
-		for fname in sorted([x for x in csvs if x.startswith(state + '-')]):
-			xtics.append('%s/%s' % re.match(r'^..-2020(..)(..)\.csv$', fname).group(1,2))
-
-		write_gnuplot(state, positives, xtics)
-
-		shellout(['gnuplot', './gnuplot/%s.gnuplot' % state])
-
 def html(states=state_abbrevs):
-	state2total = {}
-	for state in states:
-		positives = get_state_positives(state)
-		state2total[state] = sorted(positives)[-1]
+	global data
 
+	state2total = {state:max(data[state].values()) for state in state_abbrevs}
 	worst2best = sorted(state2total, key=lambda x: state2total[x], reverse=True)
 	for state in worst2best:
 		print('state %s has %d cases' % (state, state2total[state]))
@@ -280,11 +232,16 @@ def html(states=state_abbrevs):
 if __name__ == '__main__':
 	command = '' if not sys.argv[1:] else sys.argv[1]
 
-	if command == 'init':
-		initialize_csvs()
-	elif command == 'update':
-		update_csvs()
+	if command == 'update':
+		csv_update()
+	elif command == 'load':
+		csv_load()
 	elif command == 'graph':
-		graph()
+		csv_load()
+		for state in state_abbrevs:
+			write_gnuplot(state)
+			shellout(['gnuplot', './gnuplot/%s.gnuplot'%state])
+
 	elif command == 'html':
+		csv_load()
 		html()
