@@ -158,25 +158,36 @@ def write_gnuplot(state):
 		fp.write('set style data linespoints\n')
 		fp.write('set key box\n')
 		fp.write('set style line 1 lt 2 lw 9 pt 9 ps 0.5\n')
-		fp.write('set xtics rotate by -45\n')
+		fp.write('set xtics rotate by -65\n')
+		fp.write('set xtics font \',8\'\n')
+		#fp.write('set bmargin 2\n')
+		#fp.write('set lmargin 0\n')
+		#fp.write('set rmargin 0\n')
+		#fp.write('set tmargin 0\n')
 		if max_ - min_ > 100:
 			fp.write('set yrange [0:%d]\n' % int(1.3 * max_))
 
-		# eg:
-		# 0 116 "03/15"
-		# 1 141 "03/16"
-		# 2 186 "03/17"
-		# 3 314 "03/18"
-		# 4 390 "03/19"
+		# <index> <positives> <rate_increase> <date>
+		# 0 116 0 "03/15"
+		# 1 141 1.216 "03/16"
+		# 2 186 1.319 "03/17"
+		# 3 314 1.688 "03/18"
+		# 4 390 1.242 "03/19"
 		fp.write('$data << EOD\n')
 		idx = 0
 		for (i, positive) in enumerate(positives):
-			fp.write('%d %d "%s"\n' % (idx, positive, xtics[i]))
+			if idx == 0 or positives[i]<8 or positives[i-1]==0:
+				daily_rate_increase = 1
+			else:
+				daily_rate_increase = positives[i] / positives[i-1]
+			fp.write('%d %d %f "%s"\n' % (idx, positive, daily_rate_increase, xtics[i]))
 			idx += 1
 		fp.write('EOD\n')
 
+		fp.write('set multiplot layout 2,1\n')
 		fp.write('set grid\n')
-		fp.write('plot "$data" using 1:2:xtic(3) title "positives" linecolor rgb "#0000FF", \\\n')
+		fp.write('set key left top\n')
+		fp.write('plot "$data" using 1:2:xtic("") title "positives" linecolor rgb "#0000FF", \\\n')
 
 		# fit a growth curve
 		idx_t1 = idx - 1
@@ -193,7 +204,13 @@ def write_gnuplot(state):
 
 		# labels
 		space = int(1.3*max_ / 20) if max_ - min_ > 100 else 1
-		fp.write('"$data" using 0:2:($1 >= %d ? sprintf("%%d            ",$2) : "") with labels notitle textcolor rgb "#0000FF"\n' % idx_t0)
+		fp.write('"$data" using 0:2:(($1 == %d || $1 == %d) ? sprintf("%%d            ",$2) : "") with labels notitle textcolor rgb "#0000FF"\n' % (idx_t1, idx_t1))
+
+		# second plot, rate of change
+		fp.write('set key right bottom\n')
+		fp.write('set yrange [0 : 2]\n')
+		fp.write('plot "$data" using 1:3:xtic(4) title "daily rate increase" linecolor rgb "#0000FF"\n')
+
 
 def html(states=state_abbrevs):
 	global data
@@ -228,7 +245,7 @@ def html(states=state_abbrevs):
 
 				state_abbrev = queue[0]
 				fp.write('      <td>\n')
-				fp.write('        %s:<br>\n' % (state_names[state_abbrev]))
+				fp.write('        <b>%s</b>:<br>\n' % (state_names[state_abbrev]))
 				fpath = './graphs/%s.png' % state_abbrev
 				fp.write('        <img src=%s?mt=%d>\n' % (fpath, int(os.path.getmtime(fpath))))
 				fp.write('      </td>\n')
