@@ -3,14 +3,11 @@
 import re
 import os
 import sys
+import math
 import time
 import random
 from subprocess import Popen, PIPE
 
-# { 'TX' -> {
-#
-#
-# }
 data = {}
 
 state_abbrevs = [ \
@@ -43,10 +40,8 @@ state_names = {
 'West Virginia', 'WI': 'Wisconsin', 'WY': 'Wyoming'
 }
 
-# the minimum data points >= 100 until the "doubler" mode of graphing activates
-min_points_doubler = 6
-
 def shellout(cmd):
+	print(' '.join(cmd))
 	process = Popen(cmd, stdout=PIPE, stderr=PIPE)
 	(stdout, stderr) = process.communicate()
 	stdout = stdout.decode("utf-8")
@@ -111,7 +106,7 @@ def csv_load():
 		dates = data[state].keys()
 
 		earliest = min(dates)
-		print('%s earliest date is %s' % (state, earliest))
+		#print('%s earliest date is %s' % (state, earliest))
 		m = re.match(r'^\d\d\d\d(\d\d)(\d\d)', earliest)
 
 		cur = ISO8601ToEpoch('2020-%s-%s' % (m.group(1), m.group(2)))
@@ -124,7 +119,6 @@ def csv_load():
 
 def write_gnuplot(state):
 	global data
-	global min_points_doubler
 
 	xtics = []
 	positives = []
@@ -132,15 +126,6 @@ def write_gnuplot(state):
 		# mm/dd
 		xtics.append('%s/%s' % re.match(r'^\d\d\d\d(\d\d)(\d\d)$', date).group(1,2))
 		positives.append(data[state][date])
-
-	doubler = len([x for x in positives if x >= 100]) >= min_points_doubler
-
-	if doubler:
-		i = 0
-		while positives[i] < 100:
-			i += 1
-		positives = positives[i:]
-		xtics = xtics[i:]
 
 	(max_, min_) = (max(positives), min(positives))
 
@@ -172,12 +157,23 @@ def write_gnuplot(state):
 
 		fp.write('set grid\n')
 		fp.write('plot "$data" using 1:2:xtic(3) title "positives" linecolor rgb "#0000FF", \\\n')
-		if doubler:
-			fp.write('%d*2**(x/2.5) title "2.5 day doubling" linecolor rgb "#FF0000", \\\n' % positives[0])
-			fp.write('%d*2**(x/3) title "3 day doubling" linecolor rgb "#FF0000", \\\n' % positives[0])
 
+		# fit a growth curve
+		idx_t1 = idx - 1
+		idx_t0 = idx_t1 - 6
+		#print('positives[%d] = %d' % (idx_t0, positives[idx_t0]))
+		#print('positives[%d] = %d' % (idx_t1, positives[idx_t1]))
+		factor_daily = (positives[idx_t1]/positives[idx_t0]) ** (1/6.0)
+		#print('daily factor: %f' % factor_daily)
+		doubling_rate = math.log(2, factor_daily)
+		fp.write('"$data" using 1:($1 < %d ? 1/0 : ' % idx_t0)
+		# week_ago_value * (1.1695 ** x) where x is [0,1,2,3,4,5,6]
+		fp.write(    '%d * (%f ** ($1-%d)) ' % (positives[idx_t0], factor_daily, idx_t0))
+		fp.write(') title "%1.1f day doubling" linecolor rgb "#FF0000", \\\n' % doubling_rate)
+
+		# labels
 		space = int(1.3*max_ / 20) if max_ - min_ > 100 else 1
-		fp.write('"$data" using 0:($2+%d):(sprintf("%%d",$2)) with labels notitle textcolor rgb "#0000FF"\n' % space)
+		fp.write('"$data" using 0:($2+%d):(sprintf("%%d",$2)) with labels notitle textcolor rgb "#0000FF"\n, \\' % space)
 
 def html(states=state_abbrevs):
 	global data
@@ -222,8 +218,7 @@ def html(states=state_abbrevs):
 		fp.write('  </table>\n')
 		fp.write('\n')
 
-		fp.write('  <p>Data comes from <a href="https://covidtracking.com/">The COVID Tracking Project</a> and their generous API. Graphs are drawn with <a href="http://www.gnuplot.info/">gnuplot</a>.</p>\n')
-		fp.write('  <p>Once %d data points greater than 100 are available, those less than 100 are ignored and comparison is made with the 2.5 day doubling curve.</p>\n' % min_points_doubler)
+		fp.write('  <p>Data comes from <a href="https://covidtracking.com/">The COVID Tracking Project</a> and their generous API. API is accessed with <a href="https://www.gnu.org/software/wget/">wget</a>. Graphs are drawn with <a href="http://www.gnuplot.info/">gnuplot</a>.</p>\n')
 		fp.write('  <p>This project is open source: <a href="https://github.com/lwerdna/uscovidgraphs">https://github.com/lwerdna/uscovidgraphs</a></p>\n')
 		fp.write('\n')
 
@@ -238,7 +233,13 @@ if __name__ == '__main__':
 		csv_load()
 	elif command == 'graph':
 		csv_load()
-		for state in state_abbrevs:
+
+		if sys.argv[2:]:
+			work = [sys.argv[2]]
+		else:
+			work = state_abbrevs
+
+		for state in work:
 			write_gnuplot(state)
 			shellout(['gnuplot', './gnuplot/%s.gnuplot'%state])
 
