@@ -62,11 +62,11 @@ def ISO8601ToEpoch(isoString: str):
 # download the latest csv from covid tracking project using wget
 def csv_update():
 	while 1:
-		if os.path.exists('/tmp/daily.csv'):
-			os.remove('/tmp/daily.csv')
+		if os.path.exists('./daily.csv'):
+			os.remove('./daily.csv')
 
 		url = 'http://covidtracking.com/api/states/daily.csv'
-		cmd = ['wget', url, '--output-document', '/tmp/daily.csv']
+		cmd = ['wget', url, '--output-document', './daily.csv']
 		print(cmd)
 		(stdout, stderr, ret_code) = shellout(cmd)
 
@@ -74,7 +74,7 @@ def csv_update():
 			print('wget returned %d, retrying...' % ret_code)
 			continue
 
-		if os.path.getsize('/tmp/daily.csv') == 0:
+		if os.path.getsize('./daily.csv') == 0:
 			print('downloaded csv is 0 bytes, retrying...')
 			continue
 
@@ -85,7 +85,7 @@ def csv_load():
 	global data
 
 	lines = []
-	with open('/tmp/daily.csv') as fp:
+	with open('./daily.csv') as fp:
 		lines = [x.strip() for x in fp.readlines()]
 
 	assert lines[0] == 'date,state,positive,negative,pending,hospitalized,death,total,hash,dateChecked,totalTestResults,fips,deathIncrease,hospitalizedIncrease,negativeIncrease,positiveIncrease,totalTestResultsIncrease'
@@ -101,6 +101,7 @@ def csv_load():
 
 	# check for missing dates
 	now = time.time()
+	nowstr = epochToISO8601(now).replace('-','')
 
 	for state in state_abbrevs:
 		dates = data[state].keys()
@@ -110,12 +111,31 @@ def csv_load():
 		m = re.match(r'^\d\d\d\d(\d\d)(\d\d)', earliest)
 
 		cur = ISO8601ToEpoch('2020-%s-%s' % (m.group(1), m.group(2)))
-		nowstr = epochToISO8601(now).replace('-','')
 		while cur < now:
 			curstr = epochToISO8601(cur).replace('-','')
 			if not curstr in dates and curstr != nowstr:
 				raise Exception('%s has no data for %s' % (state, curstr))
 			cur += 24*3600
+
+	# generate 'US'
+	earliest = list(data['AK'].keys())[0]
+	for state in state_abbrevs:
+		earliest = min(earliest, min(data[state].keys()))
+	m = re.match(r'^\d\d\d\d(\d\d)(\d\d)', earliest)
+	cur = ISO8601ToEpoch('2020-%s-%s' % (m.group(1), m.group(2)))
+
+	data['US'] = {}
+	while cur < now:
+		curstr = epochToISO8601(cur).replace('-','')
+		total = 0
+		for state in state_abbrevs:
+			total += data[state].get(curstr, 0)
+		if total == 0: break
+		data['US'][curstr] = total
+		cur += 24*3600
+
+	state_abbrevs.append('US')
+	state_names['US'] = 'United States'
 
 def write_gnuplot(state):
 	global data
