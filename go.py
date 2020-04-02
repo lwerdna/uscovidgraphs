@@ -173,7 +173,7 @@ def write_gnuplot(state):
 
 		# labels
 		space = int(1.3*max_ / 20) if max_ - min_ > 100 else 1
-		fp.write('"$data" using 0:($2+%d):(sprintf("%%d",$2)) with labels notitle textcolor rgb "#0000FF"\n, \\' % space)
+		fp.write('"$data" using 0:2:($1 >= %d ? sprintf("%%d            ",$2) : "") with labels notitle textcolor rgb "#0000FF"\n' % idx_t0)
 
 def html(states=state_abbrevs):
 	global data
