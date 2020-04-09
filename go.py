@@ -152,10 +152,12 @@ def write_gnuplot(state):
 
 	xtics = []
 	positives = []
+	total_tests = []
 	for date in sorted(data[state]):
 		# mm/dd
 		xtics.append('%s/%s' % re.match(r'^\d\d\d\d(\d\d)(\d\d)$', date).group(1,2))
 		positives.append(data[state][date]['positive'])
+		total_tests.append(positives[-1] + data[state][date]['negative'])
 
 	(max_, min_) = (max(positives), min(positives))
 
@@ -175,9 +177,10 @@ def write_gnuplot(state):
 		#fp.write('set rmargin 0\n')
 		#fp.write('set tmargin 0\n')
 		if max_ - min_ > 100:
-			fp.write('set yrange [0:%d]\n' % int(1.3 * max_))
+			fp.write('set yrange [0:%d]\n' % int(1.0 * max(total_tests)))
+			#fp.write('set yrange [0:%d]\n' % int(1.3 * max_))
 
-		# <index> <positives> <rate_increase> <date>
+		# <index> <positives> <total_tests> <rate_increase> <date>
 		# 0 116 0 "03/15"
 		# 1 141 1.216 "03/16"
 		# 2 186 1.319 "03/17"
@@ -190,7 +193,7 @@ def write_gnuplot(state):
 				daily_rate_increase = 1
 			else:
 				daily_rate_increase = positives[i] / positives[i-1]
-			fp.write('%d %d %f "%s"\n' % (idx, positive, daily_rate_increase, xtics[i]))
+			fp.write('%d %d %d %f "%s"\n' % (idx, positive, total_tests[i], daily_rate_increase, xtics[i]))
 			idx += 1
 		fp.write('EOD\n')
 
@@ -198,6 +201,7 @@ def write_gnuplot(state):
 		fp.write('set grid\n')
 		fp.write('set key left top\n')
 		fp.write('plot "$data" using 1:2:xtic("") title "positives" linecolor rgb "#0000FF", \\\n')
+		fp.write('"$data" using 1:3:xtic("") title "total tests" linecolor rgb "#FF00FF", \\\n')
 
 		# fit a growth curve
 		idx_t1 = idx - 1
@@ -213,13 +217,12 @@ def write_gnuplot(state):
 		fp.write(') title "%1.1f day doubling" linecolor rgb "#FF0000", \\\n' % doubling_rate)
 
 		# labels
-		space = int(1.3*max_ / 20) if max_ - min_ > 100 else 1
-		fp.write('"$data" using 0:2:(($1 == %d || $1 == %d) ? sprintf("%%d            ",$2) : "") with labels notitle textcolor rgb "#0000FF"\n' % (idx_t1, idx_t1))
+		fp.write('"$data" using 0:2:(($1 == %d || $1 == %d) ? sprintf("%%d                ",$2) : "") with labels notitle textcolor rgb "#0000FF"\n' % (idx_t1, idx_t1))
 
 		# second plot, rate of change
 		fp.write('set key right top\n')
 		fp.write('set yrange [1 : 1.75]\n')
-		fp.write('plot "$data" using 1:3:xtic(4) title "daily rate increase" linecolor rgb "#0000FF"\n')
+		fp.write('plot "$data" using 1:4:xtic(5) title "daily rate increase" linecolor rgb "#0000FF"\n')
 
 
 def html(states=state_abbrevs):
