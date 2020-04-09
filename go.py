@@ -59,6 +59,14 @@ def ISO8601ToEpoch(isoString: str):
 	epoch = time.mktime(timeStruct)
 	return epoch
 
+def YYYYMMDDToEpoch(d: str):
+	assert re.match(r'^(\d\d\d\d)(\d\d)(\d\d)', d)
+	return ISO8601ToEpoch(d[0:4]+'-'+d[4:6]+'-'+d[6:8])
+
+def epochToYYYYMMDD(e: float):
+	t = epochToISO8601(e)
+	return t.replace('-', '')
+
 # download the latest csv from covid tracking project using wget
 def csv_update():
 	while 1:
@@ -105,18 +113,16 @@ def csv_load():
 
 	# check for missing dates
 	now = time.time()
-	nowstr = epochToISO8601(now).replace('-','')
+	nowstr = epochToYYYYMMDD(now)
 
 	for state in state_abbrevs:
 		dates = data[state].keys()
-
 		earliest = min(dates)
 		#print('%s earliest date is %s' % (state, earliest))
-		m = re.match(r'^\d\d\d\d(\d\d)(\d\d)', earliest)
+		cur = YYYYMMDDToEpoch(earliest)
 
-		cur = ISO8601ToEpoch('2020-%s-%s' % (m.group(1), m.group(2)))
 		while cur < now:
-			curstr = epochToISO8601(cur).replace('-','')
+			curstr = epochToYYYYMMDD(cur)
 			if not curstr in dates and curstr != nowstr:
 				raise Exception('%s has no data for %s' % (state, curstr))
 			cur += 24*3600
@@ -127,12 +133,11 @@ def csv_load():
 		earliest = min(earliest, min(data[state].keys()))
 		latest = max(latest, max(data[state].keys()))
 	print('latest date is: %s' % latest)
-	m = re.match(r'^\d\d\d\d(\d\d)(\d\d)', earliest)
-	cur = ISO8601ToEpoch('2020-%s-%s' % (m.group(1), m.group(2)))
+	cur = YYYYMMDDToEpoch(earliest)
 
 	data['US'] = {}
 	while cur < now:
-		curstr = epochToISO8601(cur).replace('-','')
+		curstr = epochToYYYYMMDD(cur)
 		positive_all_states = 0
 		negative_all_states = 0
 		for state in state_abbrevs:
@@ -153,9 +158,16 @@ def write_gnuplot(state):
 	xtics = []
 	positives = []
 	total_tests = []
+
+	now = time.time()
+	three_weeks_ago = now - 3*7*24*60*60
+
 	for date in sorted(data[state]):
+		if YYYYMMDDToEpoch(date) < three_weeks_ago:
+			continue
+
 		# mm/dd
-		xtics.append('%s/%s' % re.match(r'^\d\d\d\d(\d\d)(\d\d)$', date).group(1,2))
+		xtics.append(date[4:6]+'/'+date[6:8])
 		positives.append(data[state][date]['positive'])
 		total_tests.append(positives[-1] + data[state][date]['negative'])
 
@@ -177,8 +189,8 @@ def write_gnuplot(state):
 		#fp.write('set rmargin 0\n')
 		#fp.write('set tmargin 0\n')
 		if max_ - min_ > 100:
-			fp.write('set yrange [0:%d]\n' % int(1.0 * max(total_tests)))
-			#fp.write('set yrange [0:%d]\n' % int(1.3 * max_))
+			#fp.write('set yrange [0:%d]\n' % int(1.0 * max(total_tests)))
+			fp.write('set yrange [0:%d]\n' % int(1.3 * max_))
 
 		# <index> <positives> <total_tests> <rate_increase> <date>
 		# 0 116 0 "03/15"
@@ -201,7 +213,7 @@ def write_gnuplot(state):
 		fp.write('set grid\n')
 		fp.write('set key left top\n')
 		fp.write('plot "$data" using 1:2:xtic("") title "positives" linecolor rgb "#0000FF", \\\n')
-		fp.write('"$data" using 1:3:xtic("") title "total tests" linecolor rgb "#FF00FF", \\\n')
+		#fp.write('"$data" using 1:3:xtic("") title "total tests" linecolor rgb "#FF00FF", \\\n')
 
 		# fit a growth curve
 		idx_t1 = idx - 1
