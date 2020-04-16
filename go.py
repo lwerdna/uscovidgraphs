@@ -287,13 +287,15 @@ def html(states=state_abbrevs):
 		fp.write('</html>\n')
 
 if __name__ == '__main__':
-	command = '' if not sys.argv[1:] else sys.argv[1]
+	commands = [] if not sys.argv[1:] else [sys.argv[1]]
+	if commands[0] == 'all':
+		commands = ['update', 'graph', 'html']
 
-	if command == 'update':
+	if 'update' in commands:
 		csv_update()
 		csv_load()
 
-	elif command == 'graph':
+	if 'graph' in commands:
 		csv_load()
 
 		if sys.argv[2:]:
@@ -305,6 +307,6 @@ if __name__ == '__main__':
 			write_gnuplot(state)
 			shellout(['gnuplot', './gnuplot/%s.gnuplot'%state])
 
-	elif command == 'html':
+	if 'html' in commands:
 		csv_load()
 		html()
