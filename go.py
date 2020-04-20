@@ -201,7 +201,9 @@ def write_gnuplot(state):
 		fp.write('$data << EOD\n')
 		idx = 0
 		for (i, positive) in enumerate(positives):
-			if idx == 0 or positives[i]<8 or positives[i-1]==0:
+			if idx == 0:
+				daily_rate_increase = positives[i+1] / positives[i]
+			elif(positives[i]<8 or positives[i-1]==0):
 				daily_rate_increase = 1
 			else:
 				daily_rate_increase = positives[i] / positives[i-1]
