@@ -233,7 +233,7 @@ def write_gnuplot(state):
 
 		# second plot, rate of change
 		fp.write('set key right top\n')
-		fp.write('set yrange [1 : 1.75]\n')
+		fp.write('set yrange [1 : 1.2]\n')
 		fp.write('plot "$data" using 1:4:xtic(5) title "daily rate increase" linecolor rgb "#0000FF"\n')
 
 
