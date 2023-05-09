@@ -96,14 +96,14 @@ def csv_load():
 	with open('./daily.csv') as fp:
 		lines = [x.strip() for x in fp.readlines()]
 
-	if not lines[0].startswith('date,state,positive,negative'):
+	if not lines[0].startswith('date,state,positive,probableCases,negative'):
 		raise Exception('unexpected csv header: %s' % lines[0])
 
 	lines = lines[1:]
 
 	for line in lines:
 		fields = line.split(',')
-		(date,state,positive,negative) = fields[0:4]
+		(date,state,positive,probableCases,negative) = fields[0:5]
 		if not state in data:
 			data[state] = {}
 		#print('appending %s (%s,%s)' % (state, date, positive))
@@ -178,7 +178,7 @@ def write_gnuplot(state):
 	print('writing %s' % fpath)
 	with open(fpath, 'w') as fp:
 		fp.write('set term png\n')
-		fp.write('set output "./graphs/%s.png\n' % (state))
+		fp.write('set output "./graphs/%s.png"\n' % (state))
 		fp.write('set style data linespoints\n')
 		fp.write('set key box opaque\n')
 		fp.write('set style line 1 lt 2 lw 9 pt 9 ps 0.5\n')
